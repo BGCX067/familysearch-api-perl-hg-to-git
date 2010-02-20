@@ -1,6 +1,0 @@
-Revision history for Perl extension WebService::FamilySearch.
-
-0.01  Wed Jan 27 20:46:59 2010
-	- original version; created by h2xs 1.23 with options
-		-AXc -n WebService::FamilySearch
-

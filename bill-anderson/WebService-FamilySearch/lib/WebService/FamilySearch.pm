@@ -1,5 +1,8 @@
 package WebService::FamilySearch;
 
+use Carp;
+use Data::Dumper;
+
 use strict;
 use warnings;
 
@@ -13,32 +16,35 @@ use LWP::UserAgent;
 
 use XML::Simple;
 
-our %EXPORT_TAGS = ( 'all' => [ qw(
-	
-) ] );
+our %EXPORT_TAGS = (
+    'all' => [
+        qw(
+
+          )
+    ]
+);
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
-	
+
 );
 
-my $revision_str = '$Revision: 8 $'; 
-(our $VERSION = $revision_str) =~ s/^\$Revision: (\d+) \$$/0.01.$1/;
-
+my $revision_str = '$Revision: 18 $';
+( our $VERSION = $revision_str ) =~ s/^\$Revision: (\d+) \$$/0.01.$1/;
 
 sub new {
-    my $proto = shift;
-    my %params = @_;
-    my $class = ref($proto) || $proto;
-    my $self  = {};
-    
-    $self->{'URL'}       = $params{'URL'};
-    $self->{'Name'}      = $params{'Name'};
-    $self->{'Password'}  = $params{'Password'};
-    $self->{'Key'}       = $params{'Key'};
+    my ($proto, %params) = @_;
+    my $class  = ref($proto) || $proto;
+    my $self   = {};
 
-    bless ($self, $class);
+    $self->{'URL'}      = $params{'URL'};
+    $self->{'Name'}     = $params{'Name'};
+    $self->{'Password'} = $params{'Password'};
+    $self->{'Key'}      = $params{'Key'};
+    $self->{'Redirect'} = $params{'Redirect'};
+
+    bless( $self, $class );
     return $self;
 }
 
@@ -78,7 +84,7 @@ sub response_xml {
 
 sub _request {
     my $self = shift;
-    my $uri = shift;
+    my $uri  = shift;
 
     $self->{'uri'} = $uri;
 
@@ -86,8 +92,8 @@ sub _request {
 
     $ua->agent("WebService::FamilySearch/0.1");
 
-    my $req = HTTP::Request->new(GET => $uri);
-    $req->authorization_basic($self->name, $self->password);
+    my $req = HTTP::Request->new( GET => $uri );
+    $req->authorization_basic( $self->name, $self->password );
 
     my $res = $ua->request($req);
 
@@ -97,8 +103,8 @@ sub _request {
     # Raw XML from response
     $self->{'response_xml'} = $res->content;
 
-    my $xs = XML::Simple->new();
-    my $ref = $xs->XMLin($res->content);
+    my $xs  = XML::Simple->new();
+    my $ref = $xs->XMLin( $res->content );
 
     # XML parsed by XML::Simple into hash
     return $ref;
@@ -112,17 +118,17 @@ sub _request {
 sub login {
     my $self = shift;
 
-    my $uri = $self->url."/identity/v1/login?key=".$self->key;
-    
+    my $uri = $self->url . "/identity/v1/login?key=" . $self->key;
+
     my $res = $self->_request($uri);
 
-    if ($res->{'statusCode'} eq 200) {
+    if ( $res->{'statusCode'} eq 200 ) {
         $self->{'sessionId'} = $res->{'session'}->{'id'};
-        return $res; 
+        return $res;
     }
     else {
-        die "Fatal login error. ".$res->{'statusMessage'}."\n";
-        return undef;
+        carp "Fatal login error. " . $res->{'statusMessage'} . "\n";
+        return;
     }
 
 }
@@ -130,17 +136,17 @@ sub login {
 sub logout {
     my $self = shift;
 
-    my $uri = $self->url."/identity/v1/logout?key=".$self->key;
+    my $uri = $self->url . "/identity/v1/logout?key=" . $self->key;
 
     my $res = $self->_request($uri);
 
-    if ($res->{'statusCode'} eq 200) {
+    if ( $res->{'statusCode'} eq 200 ) {
         $self->{'sessionId'} = $res->{'session'}->{'id'};
         return $res;
     }
     else {
-        die "Fatal logout error. ".$res->{'statusMessage'}."\n";
-        return undef;
+        carp "Fatal logout error. " . $res->{'statusMessage'} . "\n";
+        return;
     }
 
 }
@@ -149,54 +155,163 @@ sub logout {
 ## Identity Module v2
 ##
 
+sub _init2 {
+    my $self = shift;
 
+    my $uri = 'http://www.dev.usys.org/identity/v2/properties';
+
+    my $res = $self->_request($uri);
+
+    if ( $res->{'statusCode'} eq 200 ) {
+        $self->{'request.token.url'} =
+          $res->{'properties'}->{'property'}->{'request.token.url'}
+          ->{'content'};
+        $self->{'authorize.url'} =
+          $res->{'properties'}->{'property'}->{'authorize.url'}->{'content'};
+        $self->{'access.token.url'} =
+          $res->{'properties'}->{'property'}->{'access.token.url'}->{'content'};
+
+    }
+
+}
+
+sub get_request_token {
+    my ($self) = @_;
+
+    _init2($self);
+
+    my $ua = LWP::UserAgent->new;
+    $ua->timeout(10);
+    $ua->env_proxy;
+
+    my ( $oauth_token, $oauth_token_secret, $oauth_callback_confirmed,
+        $oauth_verifier );
+
+    my $oauth_nonce = int( rand(10000000000) );
+
+    my $response = $ua->post(
+        'http://www.dev.usys.org/identity/v2/request_token',
+        [
+            oauth_consumer_key     => $self->key(),
+            oauth_signature_method => 'PLAINTEXT',
+            oauth_nonce            => $oauth_nonce,
+            oauth_version          => '1.0',
+            oauth_signature        => '&',
+            oauth_timestamp        => time(),
+            oauth_callback         => $self->{'Redirect'},
+        ]
+    );
+
+    if ( $response->is_success ) {
+        my $reply = $response->decoded_content;
+
+        if ( $reply =~ /oauth_token=(.*?)&/ ) {
+            $oauth_token = $1;
+        }
+
+        if ( $reply =~ /oauth_token_secret=(.*?)&/ ) {
+            $oauth_token_secret = $1;
+        }
+    }
+    else {
+        carp $response->content;
+    }
+
+    $self->{'oauth_token'} = $oauth_token;
+    $self->{'oauth_token_secret'} = $oauth_token_secret;
+
+    return ($oauth_token, $oauth_token_secret);
+
+}
+
+sub get_access_token {
+    my ($self, $oauth_verifier, $oauth_token, $oauth_secret)  = @_;
+    
+    my $ua = LWP::UserAgent->new;
+    $ua->timeout(10);
+    $ua->env_proxy;
+
+    my $oauth_nonce = int(rand(10000000000));
+
+    my $response =  $ua->post('http://www.dev.usys.org/identity/v2/access_token',
+       [oauth_consumer_key     => $self->key,
+        oauth_verifier         => $oauth_verifier,
+        oauth_nonce            => $oauth_nonce,
+        oauth_signature_method => 'PLAINTEXT',
+        oauth_signature        => "&".$oauth_secret,
+        oauth_timestamp        => time(),
+        oauth_token            => $oauth_token, ]
+    );
+     
+    my ($oauth_token, $oauth_token_secret);
+
+    if ($response->is_success) {
+        my $reply = $response->decoded_content;
+    
+        if ($reply =~ /oauth_token=(.*?)&/) {
+           $oauth_token = $1;
+           $self->{'sessionId'} = $oauth_token;
+        }
+    
+        if ($reply =~ /oauth_token_secret=(.*)/) {
+           $oauth_token_secret = $1;
+        }
+    }
+    else {
+        carp $response->content;
+    }
+    
+    return ($oauth_token, $oauth_token_secret);
+}
 
 ##
 ## Family Tree Module v2
 ##
 
 sub search {
-    my $self = shift;
-    my %params = @_; 
+    my $self   = shift;
+    my %params = @_;
 
-    my $uri = $self->url."/familytree/v2/search/";
+    my $uri = $self->url . "/familytree/v2/search/";
 
-    $uri .= "?sessionId=".$self->{'sessionId'};
+    $uri .= "?sessionId=" . $self->{'sessionId'};
 
-    foreach my $param (keys %params) {
-       $uri .= "&".$param."=".$params{$param};
+    foreach my $param ( keys %params ) {
+        $uri .= "&" . $param . "=" . $params{$param};
     }
 
     my $res = $self->_request($uri);
 
-    if ($res->{'statusCode'} eq 200) {
+    if ( $res->{'statusCode'} eq 200 ) {
         return $res;
     }
     else {
-        die "Fatal search error. ".$res->{'statusMessage'}."\n";
-        return undef;
+        carp "Fatal search error. " . $res->{'statusMessage'} . "\n";
+        return;
     }
 
+    return;
 
 }
 
 sub user_read {
     my $self = shift;
 
-    my $uri = $self->url."/familytree/v2/user/";
+    my $uri = $self->url . "/familytree/v2/user/";
 
-    $uri .= "?sessionId=".$self->{'sessionId'};
+    $uri .= "?sessionId=" . $self->{'sessionId'};
 
     my $res = $self->_request($uri);
 
-    if ($res->{'statusCode'} eq 200) {
+    if ( $res->{'statusCode'} eq 200 ) {
         return $res;
     }
     else {
-        die "Fatal user read error. ".$res->{'statusMessage'}."\n";
-        return undef;
+        carp "Fatal user read error. " . $res->{'statusMessage'} . "\n";
+        return;
     }
 
+    return;
 
 }
 
@@ -204,24 +319,24 @@ sub user_read {
 ## Authorities module v1
 ##
 
-
 ##
 ## System module v1
 ##
 
-sub status { 
-   my $self = shift;
+sub status {
+    my $self = shift;
 
-    my $uri = $self->url."/system/v1/status";
+    my $uri = $self->url . "/system/v1/status";
 
     my $res = $self->_request($uri);
 
-    if ($res->{'status'}->{'code'} eq 'Ok') {
-        return $res;
+    if ( $res->{'status'}->{'code'} eq 'Ok' ) {
+        $self->{'status'} = $res->{'status'};
+        return $res->{'status'}->{'code'};
     }
     else {
-        die "Fatal system status error. ".$res->{'statusMessage'}."\n";
-        return undef;
+        carp "Fatal system status error. " . $res->{'statusMessage'} . "\n";
+        return;
     }
 
 }
@@ -231,21 +346,21 @@ sub status {
 ##
 
 sub temples {
-   my $self = shift;
+    my $self = shift;
 
-    my $uri = $self->url."/temple/v1/temple";
+    my $uri = $self->url . "/temple/v1/temple";
 
-    $uri .= "?sessionId=".$self->{'sessionId'};
+    $uri .= "?sessionId=" . $self->{'sessionId'};
 
     my $res = $self->_request($uri);
 
     # if (1) {
-    if ($res->{'statusCode'} eq 200) {
+    if ( $res->{'statusCode'} eq 200 ) {
         return $res;
     }
     else {
-        die "Fatal temple error. ".$res->{'statusMessage'}."\n";
-        return undef;
+        carp "Fatal temple error. " . $res->{'statusMessage'} . "\n";
+        return;
     }
 
 }

@@ -1,40 +1,91 @@
-WebService-FamilySearch version 0.01
-====================================
+NAME
+    WebService::FamilySearch - Perl extension for the Family Search API
 
-The README is used to introduce the module and provide instructions on
-how to install the module, any machine dependencies it may have (for
-example C compilers and installed libraries) and any other information
-that should be provided before the module is installed.
+SYNOPSIS
+     my $fs = WebService::FamilySearch->new('URL'      => 'http://www.dev.usys.org',
+                                            'Name'     => 'api-user-0000',
+                                            'Password' => 'xxxx',
+                                            'Key'      => 'XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX'
+                                           );
 
-A README file is required for CPAN modules since CPAN extracts the
-README file from a module distribution so that people browsing the
-archive can use it get an idea of the modules uses. It is usually a
-good idea to provide version information here so that people can
-decide whether fixes for the module are worth downloading.
+     my $xml_hash;
 
-INSTALLATION
+     $xml_hash = $fs->status;
 
-To install this module type the following:
+     $xml_hash = $fs->login;
 
-   perl Makefile.PL
-   make
-   make test
-   make install
+     $xml_hash = $fs->user_read;
 
-DEPENDENCIES
+     $xml_hash = $fs->temples;
 
-This module requires these other modules and libraries:
+     $xml_hash = $fs->search('familyName' => 'Smith',
+                             'givenName'  => 'John',
+                             'maxResults' => '2'
+                            );
 
-  blah blah blah
+     $xml_hash = $fs->logout;
 
-COPYRIGHT AND LICENCE
+DESCRIPTION
+    Perl extension for the Family Search API
 
-Put the correct copyright and licence information here.
+METHODS
+  new
+    Constructs the FamilySearch object.
 
-Copyright (C) 2010 by A. U. Thor
+  url
+    Sets/gets the base URL for searches
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.10.0 or,
-at your option, any later version of Perl 5 you may have available.
+  name
+    Sets/gets the user name
 
+  password
+    Sets/get the password for the user
+
+  key
+    Sets/gets the developer's key
+
+  response_raw
+    Gets the HTTP::Response object for the mose recent request
+
+  response_xml
+    Gets the response to the most recent request, in XML
+
+  login
+    Logs into the family search system. Returns the response parsed by
+    XML::Simple
+
+  logout
+    Logs out of the family search system. Returns the response parsed by
+    XML::Simple
+
+  search
+    Performs a search based on the passed parameters. Returns the response
+    parsed by XML::Simple
+
+  user_read
+    Get information on the currently logged on user. Returns the response
+    parsed by XML::Simple
+
+  status
+    Gets system status. Returns the response parsed by XML::Simple
+
+  temples
+    Get a list of temples and their codes. Returns the response parsed by
+    XML::Simple
+
+REQUIREMENTS
+    LWP::UserAgent, XML::Simple
+
+SEE ALSO
+    <http://devnet.familysearch.org/docs/>
+
+AUTHOR
+    Bill Anderson <bill@anderson-ent.com>
+
+COPYRIGHT AND LICENSE
+    Copyright (C) 2010 by Bill Anderson
+
+    This library is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself, either Perl version 5.10.0 or, at
+    your option, any later version of Perl 5 you may have available.
 

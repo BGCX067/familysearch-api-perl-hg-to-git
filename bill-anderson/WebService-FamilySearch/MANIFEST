@@ -1,6 +1,13 @@
 Changes
-Makefile.PL
+INSTALL
 MANIFEST
+Makefile.PL
 README
-t/WebService-FamilySearch.t
+README.html
+demo/cgi-bin/familysearch.cgi
+demo/cgi-bin/familysearch.tmpl
+demo/cgi-bin/index.cgi
+demo/cgi-bin/index.tmpl
+demo/html/familysearch.css
 lib/WebService/FamilySearch.pm
+t/WebService-FamilySearch.t

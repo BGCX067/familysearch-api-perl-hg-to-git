@@ -8,5 +8,5 @@ WriteMakefile(
     PREREQ_PM         => {LWP::UserAgent, XML::Simple}, # e.g., Module::Name => 1.1
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/WebService/FamilySearch.pm', # retrieve abstract from module
-       AUTHOR         => 'Bill Anderson <bill#anderson-ent.com>') : ()),
+       AUTHOR         => 'Bill Anderson <bill@anderson-ent.com>') : ()),
 );
